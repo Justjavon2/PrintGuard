@@ -10,8 +10,8 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.services.camera_manager import CameraManager
-from backend.services.station_registry import PrinterStation, StationRegistry
+from backend.services.cameraManager import CameraManager
+from backend.services.stationRegistry import PrinterStation, StationRegistry
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 

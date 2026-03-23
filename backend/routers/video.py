@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.services.camera_manager import CameraManager
+from backend.services.cameraManager import CameraManager
 
 router = APIRouter(prefix="/api/video", tags=["video"])
 cameraManager = CameraManager()

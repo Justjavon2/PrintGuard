@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers import video, printer, stations
 from backend.database import db
-from backend.services.camera_manager import CameraManager
-from backend.services.station_registry import StationRegistry
+from backend.services.cameraManager import CameraManager
+from backend.services.stationRegistry import StationRegistry
 
 # Shared singletons
 cameraManager = CameraManager()
