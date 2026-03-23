@@ -4,19 +4,19 @@
 > Transforming additive manufacturing through autonomous, scalable, and concurrent monitoring that turns machine failures into instant alerts and actionable data.
 
 ## Details
-**PrintGuard** is an AI-powered process monitoring platform designed to help manufacturers, teams, and hobbyists eliminate 3D printing failures in real-time. Rather than relying on manual supervision or post-print inspection, PrintGuard uses a multi-camera computer vision system to continuously assess the health of a print. 
+**PrintGuard** is an AI-powered process monitoring platform designed to help manufacturers, teams, and hobbyists eliminate 3D printing failures in real-time. Rather than relying on manual supervision or post-print inspection, PrintGuard uses a **multi-camera computer vision system** to continuously assess the health of every print across your fleet simultaneously.
 
-The system tracks the physical layer against the intended G-code path, identifying defects in the machine’s execution (such as warping, spaghetti, or under-extrusion) as they happen. Through the PrintGuard web platform, authenticated users can monitor their machines via a real-time livestream feed, complete with a dynamic "Print Health" confidence percentage bar. When the AI's confidence drops below a safe threshold, the system triggers an emergency stop and immediately dispatches an email notification. 
+The system is built from the ground up for **multi-camera scalability** — a single PrintGuard instance can ingest feeds from several webcams at once, each assigned to a specific printer or viewing angle. A fine-tuned YOLOv8 model analyzes each camera feed in parallel, identifying defects (such as warping, spaghetti, stringing, or detachment) as they happen. When a failure is confirmed, PrintGuard sends G-code commands directly to the affected printer over USB serial via **pyserial** — no OctoPrint or intermediate server software required — and immediately dispatches an email notification.
 
-Built with scalability in mind, PrintGuard features robust Organization management. Users can join teams to view each other's live printing feeds, analyze fleet-wide statistics, and subscribe to shared error notifications, making it the perfect tool for makerspaces, university labs, and industrial print farms.
+Through the PrintGuard web platform, authenticated users can monitor all of their machines side-by-side via real-time livestream feeds, complete with a dynamic "Print Health" confidence percentage bar per camera. Built with scalability in mind, PrintGuard features robust Organization management. Users can join teams to view each other's live printing feeds, analyze fleet-wide statistics, and subscribe to shared error notifications, making it the perfect tool for makerspaces, university labs, and industrial print farms.
 
 ## Unique Features
-* **Real-Time Print Dashboard:** Monitor your prints with a live camera feed and a dynamic AI confidence percentage bar indicating current print health.
+* **Multi-Camera Scalability:** Add cameras and printers as your lab grows — each feed is processed independently, so scaling from 1 printer to 20 requires zero architectural changes.
+* **Real-Time Print Dashboard:** Monitor every printer side-by-side with live camera feeds and a dynamic AI confidence percentage bar per camera.
+* **Direct Serial Printer Control:** Sends G-code commands (e.g., `M0` pause, `M112` emergency stop) directly to printers over USB via pyserial — no OctoPrint or extra server software needed.
 * **Instant Email Notifications:** Secure user authentication linked to an automated alert system that emails you the moment a defect is detected.
 * **Organization & Team Hub:** Create or join organizations to share live camera feeds, track fleet-wide print statistics, and manage collaborative printing workflows.
-* **Multi-Camera Vision Mesh:** Scalable support for multiple angles to eliminate nozzle occlusion and monitor large-scale industrial printers.
-* **Defect Detection:** Real-time identification of "Spaghetti," "Warping," and "Delamination" using high-speed YOLO (You Only Look Once) object detection models.
-* **Autonomous Intervention:** Automatic "Emergency Stop" triggers via OctoPrint when catastrophic failures occur.
+* **Defect Detection:** Real-time identification of "Spaghetti," "Warping," "Stringing," and "Detachment" using high-speed YOLOv8 object detection models.
 
 ## Tech Stack
 * **Backend:** FastAPI (Python w/ pyserial & OpenCV)
@@ -64,11 +64,11 @@ Built with scalability in mind, PrintGuard features robust Organization manageme
 ### Frontend Setup
 
 1.  **Environment variable set up:**
-    Create a new file named `.env.local` in the `frontend/printguard` directory and add correct variables from `.env.example`. Change the backend URL to your local backend URL if needed.
+    Create a new file named `.env.local` in the `frontend/PG` directory and add correct variables from `.env.example`. Change the backend URL to your local backend URL if needed.
 
 2.  **Navigate to the Frontend Directory:**
     ```bash
-    cd frontend/printguard
+    cd frontend/PG
     ```
 
 3.  **Install Packages & Launch Development Server:**

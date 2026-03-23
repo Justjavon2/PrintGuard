@@ -104,4 +104,3 @@ Thermal readings and detection
 
 SMS notifications
 
-testing
