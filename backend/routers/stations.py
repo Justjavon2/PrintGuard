@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from backend.routers import video
 from backend.services.cameraManager import CameraManager
 from backend.services.stationRegistry import PrinterStation, StationRegistry
 
@@ -36,40 +37,91 @@ def _cam() -> CameraManager:
     assert _cameraManager is not None, "CameraManager not initialised"
     return _cameraManager
 
-# ---------------------------------------------------------------------------
+
 class StationCreateRequest(BaseModel):
     name: str = Field(..., description="Human-readable label")
-    cameraSourceId: int = Field(..., ge=0, le=16)
+    cameraSourceKeys: List[str] = Field(default_factory=list, description="List of camera source keys")
+    defaultCameraSourceKey: Optional[str] = Field(default=None, description="Default camera source key")
+    cameraSourceId: Optional[int] = Field(default=None, ge=0, le=31, description="Legacy local camera index")
     serialPort: Optional[str] = Field(default=None)
     baudRate: int = Field(default=115200, ge=9600, le=1000000)
+
+
+class StationUpdateCamerasRequest(BaseModel):
+    cameraSourceKeys: List[str] = Field(..., min_items=1, max_items=16)
+    defaultCameraSourceKey: str = Field(...)
 
 
 class StationResponse(BaseModel):
     stationId: str
     name: str
-    cameraSourceId: int
+    cameraSourceKeys: List[str]
+    defaultCameraSourceKey: str
+    cameraSourceId: Optional[int]
     serialPort: Optional[str]
     baudRate: int
 
-# ---------------------------------------------------------------------------
+
+def _normaliseStationCameraInput(payload: StationCreateRequest) -> tuple[List[str], str, Optional[int]]:
+    cameraSourceKeys = payload.cameraSourceKeys
+    cameraSourceId = payload.cameraSourceId
+    if len(cameraSourceKeys) == 0 and cameraSourceId is not None:
+        cameraSourceKeys = [f"local:{cameraSourceId}"]
+    if len(cameraSourceKeys) == 0:
+        raise HTTPException(status_code=400, detail="Provide at least one camera source")
+
+    defaultCameraSourceKey = payload.defaultCameraSourceKey or cameraSourceKeys[0]
+    if defaultCameraSourceKey not in cameraSourceKeys:
+        raise HTTPException(status_code=400, detail="defaultCameraSourceKey must be part of cameraSourceKeys")
+    if cameraSourceId is None and defaultCameraSourceKey.startswith("local:"):
+        _, rawIndex = defaultCameraSourceKey.split(":", maxsplit=1)
+        if rawIndex.isdigit():
+            cameraSourceId = int(rawIndex)
+    return cameraSourceKeys, defaultCameraSourceKey, cameraSourceId
+
+
+def _resolveStationSource(station: PrinterStation, sourceKey: Optional[str]) -> str:
+    resolvedSourceKey = sourceKey or station.defaultCameraSourceKey
+    if resolvedSourceKey not in station.cameraSourceKeys:
+        raise HTTPException(status_code=404, detail="Camera source not assigned to station")
+    return resolvedSourceKey
+
+
+def _ensureSourceWorker(sourceKey: str) -> None:
+    source = video.sourceRegistry.getSourceByKey(sourceKey, maxSources=32)
+    if source is None:
+        raise HTTPException(status_code=404, detail=f"Camera source '{sourceKey}' not available")
+    _cam().ensureWorker(
+        sourceKey=source.sourceKey,
+        sourceValue=source.sourceValueForCapture(),
+        width=None,
+        height=None,
+        maxFps=30,
+    )
+
+
 @router.get("/", response_model=List[StationResponse])
 def listStations() -> List[StationResponse]:
-    return [
-        StationResponse(**s.model_dump()) for s in _reg().list_all()
-    ]
+    return [StationResponse(**station.model_dump()) for station in _reg().list_all()]
 
 
 @router.post("/", response_model=StationResponse, status_code=201)
 def createStation(payload: StationCreateRequest) -> StationResponse:
+    cameraSourceKeys, defaultCameraSourceKey, cameraSourceId = _normaliseStationCameraInput(payload)
+    for sourceKey in cameraSourceKeys:
+        source = video.sourceRegistry.getSourceByKey(sourceKey, maxSources=32)
+        if source is None:
+            raise HTTPException(status_code=404, detail=f"Camera source '{sourceKey}' not available")
     station = PrinterStation(
         name=payload.name,
-        cameraSourceId=payload.cameraSourceId,
+        cameraSourceKeys=cameraSourceKeys,
+        defaultCameraSourceKey=defaultCameraSourceKey,
+        cameraSourceId=cameraSourceId,
         serialPort=payload.serialPort,
         baudRate=payload.baudRate,
     )
     _reg().add(station)
-    # Start the camera worker immediately so frames are ready.
-    _cam().ensureWorker(station.cameraSourceId, None, None, 30)
+    _ensureSourceWorker(defaultCameraSourceKey)
     return StationResponse(**station.model_dump())
 
 
@@ -81,27 +133,61 @@ def getStation(stationId: str) -> StationResponse:
     return StationResponse(**station.model_dump())
 
 
+@router.put("/{stationId}/cameras", response_model=StationResponse)
+def updateStationCameras(stationId: str, payload: StationUpdateCamerasRequest) -> StationResponse:
+    station = _reg().get(stationId)
+    if station is None:
+        raise HTTPException(status_code=404, detail="Station not found")
+    if payload.defaultCameraSourceKey not in payload.cameraSourceKeys:
+        raise HTTPException(status_code=400, detail="defaultCameraSourceKey must be part of cameraSourceKeys")
+    for sourceKey in payload.cameraSourceKeys:
+        source = video.sourceRegistry.getSourceByKey(sourceKey, maxSources=32)
+        if source is None:
+            raise HTTPException(status_code=404, detail=f"Camera source '{sourceKey}' not available")
+
+    station.cameraSourceKeys = payload.cameraSourceKeys
+    station.defaultCameraSourceKey = payload.defaultCameraSourceKey
+    if payload.defaultCameraSourceKey.startswith("local:"):
+        _, rawSourceId = payload.defaultCameraSourceKey.split(":", maxsplit=1)
+        station.cameraSourceId = int(rawSourceId) if rawSourceId.isdigit() else None
+    else:
+        station.cameraSourceId = None
+    _reg().add(station)
+    _ensureSourceWorker(station.defaultCameraSourceKey)
+    return StationResponse(**station.model_dump())
+
+
 @router.delete("/{stationId}")
 def deleteStation(stationId: str) -> dict:
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
-    _cam().stopOne(station.cameraSourceId)
     _reg().remove(stationId)
     return {"status": "removed", "stationId": stationId}
 
-# ---------------------------------------------------------------------------
+
 def _encodeJpeg(frame: object) -> Optional[bytes]:
-    ok, buf = cv2.imencode(".jpg", frame)
-    return buf.tobytes() if ok else None
+    ok, buffer = cv2.imencode(".jpg", frame)
+    return buffer.tobytes() if ok else None
 
 
 @router.get("/{stationId}/snapshot")
-def stationSnapshot(stationId: str) -> Response:
+def stationSnapshot(stationId: str, sourceKey: Optional[str] = Query(default=None)) -> Response:
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
-    frameData = _cam().getLatestFrame(station.cameraSourceId, None, None, 30)
+    resolvedSourceKey = _resolveStationSource(station, sourceKey)
+    source = video.sourceRegistry.getSourceByKey(resolvedSourceKey, maxSources=32)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Camera source not available")
+
+    frameData = _cam().getLatestFrame(
+        sourceKey=source.sourceKey,
+        sourceValue=source.sourceValueForCapture(),
+        width=None,
+        height=None,
+        maxFps=30,
+    )
     if frameData is None:
         raise HTTPException(status_code=404, detail="Camera not available")
     _, frame = frameData
@@ -114,31 +200,41 @@ def stationSnapshot(stationId: str) -> Response:
 @router.get("/{stationId}/stream")
 def stationStream(
     stationId: str,
+    sourceKey: Optional[str] = Query(default=None),
     fps: int = Query(default=10, ge=1, le=60),
 ) -> StreamingResponse:
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
-    camId = station.cameraSourceId
+    resolvedSourceKey = _resolveStationSource(station, sourceKey)
+    source = video.sourceRegistry.getSourceByKey(resolvedSourceKey, maxSources=32)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Camera source not available")
 
     def generate() -> Generator[bytes, None, None]:
-        delay = 1.0 / float(fps)
+        frameDelay = 1.0 / float(fps)
         while True:
-            frameData = _cam().getLatestFrame(camId, None, None, fps)
+            frameData = _cam().getLatestFrame(
+                sourceKey=source.sourceKey,
+                sourceValue=source.sourceValueForCapture(),
+                width=None,
+                height=None,
+                maxFps=fps,
+            )
             if frameData is None:
-                time.sleep(delay)
+                time.sleep(frameDelay)
                 continue
             _, frame = frameData
             jpg = _encodeJpeg(frame)
             if jpg is None:
-                time.sleep(delay)
+                time.sleep(frameDelay)
                 continue
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
-            time.sleep(delay)
+            time.sleep(frameDelay)
 
     return StreamingResponse(generate(), media_type="multipart/x-mixed-replace; boundary=frame")
 
-# ---------------------------------------------------------------------------
+
 def _sendSerial(station: PrinterStation, command: str) -> dict:
     if station.serialPort is None:
         raise HTTPException(
@@ -148,9 +244,9 @@ def _sendSerial(station: PrinterStation, command: str) -> dict:
     from serial import Serial, SerialException
 
     try:
-        with Serial(station.serialPort, station.baudRate, timeout=2) as ser:
-            ser.write((command + "\n").encode("utf-8"))
-            ser.flush()
+        with Serial(station.serialPort, station.baudRate, timeout=2) as serialPort:
+            serialPort.write((command + "\n").encode("utf-8"))
+            serialPort.flush()
     except SerialException as exc:
         raise HTTPException(status_code=500, detail=f"Serial error: {exc}") from exc
     except OSError as exc:

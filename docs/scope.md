@@ -1,0 +1,45 @@
+# PrintGuard Scope Tracking
+
+## End Goal
+
+Deliver a scalable, real-time printer monitoring platform where users can:
+- Monitor many camera feeds per printer or per fleet.
+- Detect print failures quickly and act (pause/stop) with minimal delay.
+- Prefer laptop/built-in camera by default on macOS while optionally enabling iPhone/external cameras.
+
+## Current Scope (In Progress)
+
+- Camera source expansion:
+  - Local cameras
+  - `RTSP` network cameras
+  - `HTTP MJPEG` network cameras
+- Camera preference persistence:
+  - Global preferred default source
+  - Optional per-printer preferred source
+- Multi-camera station model:
+  - `cameraSourceKeys[]`
+  - `defaultCameraSourceKey`
+- Frontend monitor UX:
+  - Two concurrent feeds visible
+  - Sliding window navigation for larger camera sets (`1+2`, `2+3`, `3+4`)
+  - Source assignment controls (`Use As Cam 1`, `Use As Cam 2`, `Set As Default Camera`)
+
+## Out of Scope For This Phase
+
+- WebRTC/HLS streaming transport migration.
+- Full auth-aware per-user preference partitioning tied to Supabase identity.
+- YOLO live inference pipeline activation (placeholder analysis endpoint remains).
+
+## Core Moving Parts
+
+- `backend/routers/video.py`: source listing/registration, stream/snapshot, preferences.
+- `backend/services/videoSourceRegistry.py`: source normalization + preferences persistence.
+- `backend/services/cameraManager.py`: worker lifecycle keyed by `sourceKey`.
+- `backend/services/stationRegistry.py` + `backend/routers/stations.py`: multi-camera station CRUD and stream/snapshot access.
+- `frontend/PG/components/live-feed-panel.tsx`: dual-feed rendering, source selection, default persistence.
+
+## Scope Guardrails
+
+- Preserve backward compatibility for legacy `sourceId` query usage while frontend migrates.
+- Keep MJPEG streaming path stable while introducing source management capabilities.
+- Keep camera selection behavior deterministic with preference-first fallback logic.

@@ -28,11 +28,15 @@ Endpoints for discovering cameras, grabbing snapshots, streaming live feeds, and
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/video/sources` | Probes camera indices 0–N and returns a list of available video sources with their IDs and labels. Query param: `maxSources` (default 5, max 16). |
-| `GET` | `/api/video/snapshot` | Returns a single JPEG frame from the specified camera. Query params: `sourceId`, `width`, `height`, `maxFps`. |
-| `GET` | `/api/video/stream` | Opens an MJPEG stream from the specified camera. Query params: `sourceId`, `fps`. The response is `multipart/x-mixed-replace` — connect from an `<img>` tag or video player. |
-| `GET` | `/api/video/analyze` | Grabs the latest frame from a camera and runs it through the YOLO inference pipeline (placeholder). Returns `sourceId`, `timestamp`, `yoloConfigured`, and `detections`. |
-| `POST` | `/api/video/analyze/batch` | Analyzes frames from multiple cameras in one request. Body: `{"sourceIds": [0, 1, ...], "width", "height", "maxFps"}`. Returns an array of per-camera analysis results. |
+| `GET` | `/api/video/sources` | Returns normalized camera metadata for local + network sources. Query param: `maxSources` (default 8, max 32). Source object fields: `sourceKey`, `sourceType` (`local`/`rtsp`/`httpMjpeg`), `displayName`, `sourceValue`, `isExternal`, `isNetwork`. |
+| `POST` | `/api/video/sources/network` | Registers a network camera source. Body: `{"sourceUrl": "rtsp://... or http(s)://...", "displayName": "optional"}`. |
+| `DELETE` | `/api/video/sources/network/{sourceKey}` | Removes a previously registered network source and stops its worker. |
+| `GET` | `/api/video/preferences` | Returns camera default preferences: `preferredDefaultSourceKey` + optional `preferredByPrinterId` map. |
+| `PUT` | `/api/video/preferences` | Updates camera default preferences. Body supports `preferredDefaultSourceKey` and/or `preferredByPrinterId`. |
+| `GET` | `/api/video/snapshot` | Returns one JPEG frame. Query params: `sourceKey` (preferred), legacy `sourceId` (backward compatible), optional `printerId`, `width`, `height`, `maxFps`. |
+| `GET` | `/api/video/stream` | Opens MJPEG stream. Query params: `sourceKey` (preferred), legacy `sourceId` (backward compatible), optional `printerId`, `fps`. |
+| `GET` | `/api/video/analyze` | Grabs frame and runs placeholder YOLO pipeline. Query params mirror `/snapshot`. Returns `sourceKey`, `timestamp`, `yoloConfigured`, `detections`. |
+| `POST` | `/api/video/analyze/batch` | Batch analyze by `sourceKeys` and/or legacy `sourceIds`. Body: `{"sourceKeys": [], "sourceIds": [], "width", "height", "maxFps"}`. |
 
 ---
 
@@ -57,16 +61,17 @@ Higher-level abstraction that links a camera to a printer as a named **station**
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/stations/` | List all registered stations. Returns an array of station objects. |
-| `POST` | `/api/stations/` | Register a new station. Body: `{"name": "Printer A", "cameraSourceId": 0, "serialPort": "/dev/ttyUSB0", "baudRate": 115200}`. `serialPort` and `baudRate` are optional. Returns the created station with a generated `stationId`. |
+| `POST` | `/api/stations/` | Register a new station. Body supports multi-camera: `{"name": "Printer A", "cameraSourceKeys": ["local:0","net:abc"], "defaultCameraSourceKey": "local:0", "serialPort": "...", "baudRate": 115200}`. Legacy `cameraSourceId` is accepted for compatibility. |
 | `GET` | `/api/stations/{stationId}` | Get details for a single station by ID. |
-| `DELETE` | `/api/stations/{stationId}` | Remove a station and stop its associated camera worker. |
+| `PUT` | `/api/stations/{stationId}/cameras` | Replace station camera assignment. Body: `{"cameraSourceKeys": [...], "defaultCameraSourceKey": "..."}`. |
+| `DELETE` | `/api/stations/{stationId}` | Remove a station registration. |
 
 ### Camera (per station)
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/stations/{stationId}/snapshot` | Returns a JPEG snapshot from this station's camera. |
-| `GET` | `/api/stations/{stationId}/stream` | Opens an MJPEG stream from this station's camera. Query param: `fps` (default 10). |
+| `GET` | `/api/stations/{stationId}/snapshot` | Returns a JPEG snapshot from station camera set. Optional query param: `sourceKey` (defaults to station default camera). |
+| `GET` | `/api/stations/{stationId}/stream` | Opens MJPEG stream from station camera set. Optional query param: `sourceKey` (defaults to station default camera), `fps` (default 10). |
 
 ### Printer Control (per station)
 

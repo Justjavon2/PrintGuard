@@ -14,7 +14,17 @@ class PrinterStation(BaseModel):
 
     stationId: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     name: str = Field(..., description="Human-readable label, e.g. 'Printer A – Front Cam'")
-    cameraSourceId: int = Field(..., ge=0, le=16, description="OpenCV camera index")
+    cameraSourceKeys: List[str] = Field(
+        default_factory=list,
+        description="Source keys for this station, e.g. ['local:0', 'net:abc123']",
+    )
+    defaultCameraSourceKey: str = Field(..., description="Default source key for this station")
+    cameraSourceId: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=31,
+        description="Legacy local camera index compatibility field",
+    )
     serialPort: Optional[str] = Field(
         default=None,
         description="Serial port path, e.g. /dev/ttyUSB0 or COM3 (None if no printer attached)",
@@ -46,10 +56,10 @@ class StationRegistry:
         with self._lock:
             return list(self._stations.values())
 
-    def get_by_camera(self, cameraSourceId: int) -> Optional[PrinterStation]:
+    def getByCameraSourceKey(self, cameraSourceKey: str) -> Optional[PrinterStation]:
         with self._lock:
             for station in self._stations.values():
-                if station.cameraSourceId == cameraSourceId:
+                if cameraSourceKey in station.cameraSourceKeys:
                     return station
             return None
 

@@ -222,11 +222,13 @@ Use **OpenCV** for frame capture and the **OctoPrint REST API** for machine cont
 
 ### Integration Flow
 
-1. **OpenCV** captures live frames from the printer's webcam.  
-2. **FastAPI** passes frames to the **YOLOv8** model for inference.  
-3. If YOLOv8 detects 3 consecutive failure frames, FastAPI POSTs to the **OctoPrint API** to halt the print.  
-4. FastAPI saves the failure event and an annotated frame to **Supabase**.  
-5. **Next.js** dashboard instantly updates via WebSocket, showing the paused print and sending an email alert.
+1. **Video Source Registry** normalizes camera inputs into stable `sourceKey` entries (`local`, `rtsp`, `httpMjpeg`).  
+2. **Camera Preferences Store** selects a default source using saved user preference, then local non-external fallback, then first available source.  
+3. **OpenCV** captures frames from the selected source key and serves snapshots + MJPEG streams through FastAPI.  
+4. **FastAPI** passes frames to the **YOLOv8** model for inference (placeholder endpoint currently in place).  
+5. If YOLOv8 detects 3 consecutive failure frames, FastAPI POSTs to the **OctoPrint API** to halt the print.  
+6. FastAPI saves the failure event and an annotated frame to **Supabase**.  
+7. **Next.js** dashboard renders dual-feed monitoring (2-feed sliding window) and camera assignment controls for scale-out camera sets.
 
 ### Risks
 
@@ -239,3 +241,9 @@ Use **OpenCV** for frame capture and the **OctoPrint REST API** for machine cont
 - Fine-tuning the YOLOv8 model on highly diverse, real-world makerspace data (varying lighting, colors, and angles).  
 - Implementing a multi-frame confidence threshold (e.g., must see the defect in 3 consecutive frames).  
 - Supporting a multi-camera vision mesh to view the print from different angles simultaneously.
+
+### Camera Source Notes (2026-03-31 update)
+
+- Station records now support multiple camera source keys (`cameraSourceKeys`) with explicit `defaultCameraSourceKey`.
+- Backend accepts both `sourceKey` and legacy `sourceId` during migration to maintain compatibility.
+- Network camera registration supports `rtsp://` and `http(s)://` (MJPEG) sources for IP cameras and bridge streams.
