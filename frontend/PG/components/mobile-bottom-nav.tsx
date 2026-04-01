@@ -6,23 +6,28 @@ import { LayoutDashboard, Printer, Bell, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MOBILE_NAV = [
-  { href: "/protected/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/protected/printers",  label: "Printers",  icon: Printer },
-  { href: "/protected/alerts",    label: "Alerts",    icon: Bell, badge: 2 },
-  { href: "/protected/history",   label: "History",   icon: History },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/printers",  label: "Printers",  icon: Printer },
+  { href: "/alerts",    label: "Alerts",    icon: Bell, badge: 2 },
+  { href: "/history",   label: "History",   icon: History },
 ];
 
-export function MobileBottomNav() {
+interface MobileBottomNavProps {
+  basePath?: "/protected" | "/demo";
+}
+
+export function MobileBottomNav({ basePath = "/protected" }: MobileBottomNavProps) {
   const pathname = usePathname();
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border flex items-center">
       {MOBILE_NAV.map(({ href, label, icon: Icon, badge }) => {
-        const active = pathname === href || pathname.startsWith(href + "/");
+        const resolvedHref = `${basePath}${href}`;
+        const active = pathname === resolvedHref || pathname.startsWith(resolvedHref + "/");
         return (
           <Link
-            key={href}
-            href={href}
+            key={resolvedHref}
+            href={resolvedHref}
             className={cn(
               "flex-1 flex flex-col items-center gap-1 py-3 relative text-xs transition-colors",
               active ? "text-primary" : "text-muted-foreground"

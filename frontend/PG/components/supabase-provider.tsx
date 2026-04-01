@@ -51,3 +51,8 @@ export const useSupabase = () => {
     }
     return context.supabase;
 };
+
+export const useOptionalSupabase = () => {
+    const context = useContext(Context);
+    return context?.supabase ?? null;
+};

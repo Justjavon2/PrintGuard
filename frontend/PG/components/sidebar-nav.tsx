@@ -2,26 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Printer,
-  Bell,
-  History,
-  Server,
-  Settings,
-} from "lucide-react";
+import { LayoutDashboard, Bell, History, Server, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { href: "/protected/dashboard", label: "Dashboard",  icon: LayoutDashboard },
-  { href: "/protected/alerts",    label: "Alerts",     icon: Bell, badge: 2 },
-  { href: "/protected/history",   label: "History",    icon: History },
-  { href: "/protected/fleet",     label: "Fleet",      icon: Server },
-  { href: "/protected/settings",  label: "Settings",   icon: Settings },
-];
+interface SidebarNavProps {
+  basePath?: "/protected" | "/demo";
+  userDisplayName?: string | null;
+  organizationName?: string | null;
+  userInitials?: string;
+}
 
-export function SidebarNav() {
+export function SidebarNav({
+  basePath = "/protected",
+  userDisplayName = "User",
+  organizationName = "Organization",
+  userInitials = "U",
+}: SidebarNavProps) {
   const pathname = usePathname();
+  const navItems = [
+    { href: `${basePath}/dashboard`, label: "Dashboard", icon: LayoutDashboard },
+    { href: `${basePath}/alerts`, label: "Alerts", icon: Bell, badge: 2 },
+    { href: `${basePath}/history`, label: "History", icon: History },
+    { href: `${basePath}/fleet`, label: "Fleet", icon: Server },
+    { href: `${basePath}/settings`, label: "Settings", icon: Settings },
+  ];
 
   return (
     <aside className="hidden md:flex flex-col w-[240px] min-h-screen border-r border-border bg-card shrink-0">
@@ -40,7 +44,7 @@ export function SidebarNav() {
 
       {/* Nav items */}
       <nav className="flex flex-col gap-1 p-3 flex-1">
-        {NAV_ITEMS.map(({ href, label, icon: Icon, badge }) => {
+        {navItems.map(({ href, label, icon: Icon, badge }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -69,11 +73,11 @@ export function SidebarNav() {
       <div className="p-3 border-t border-border">
         <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md">
           <div className="w-7 h-7 rounded-full bg-surface-2 flex items-center justify-center text-xs font-semibold text-muted-foreground">
-            LM
+            {userInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-foreground truncate">Lab Manager</p>
-            <p className="text-[10px] text-muted-foreground truncate">DSU Makerspace</p>
+            <p className="text-xs font-medium text-foreground truncate">{userDisplayName}</p>
+            <p className="text-[10px] text-muted-foreground truncate">{organizationName}</p>
           </div>
         </div>
       </div>

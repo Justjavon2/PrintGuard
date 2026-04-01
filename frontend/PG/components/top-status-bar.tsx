@@ -1,11 +1,17 @@
 "use client";
 
-import { Bell, ChevronDown, LogOut } from "lucide-react";
+import { Bell, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useBackendHealth } from "@/components/backend-health-provider";
 import { cn } from "@/lib/utils";
 
-export function TopStatusBar() {
+interface TopStatusBarProps {
+  activeOrganizationName: string | null;
+  dataMode: "demo" | "real";
+  userInitials: string;
+}
+
+export function TopStatusBar({ activeOrganizationName, dataMode, userInitials }: TopStatusBarProps) {
   const { status } = useBackendHealth();
 
   const systemStatus =
@@ -17,16 +23,27 @@ export function TopStatusBar() {
 
   return (
     <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4 shrink-0">
-      {/* Lab selector */}
-      <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <span className="font-medium text-foreground">DSU Makerspace</span>
+      <Link
+        href="/protected/select-org"
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <span className="font-medium text-foreground">{activeOrganizationName ?? "Select Organization"}</span>
         <ChevronDown size={14} />
-      </button>
+      </Link>
 
-      {/* Spacer */}
+      <span
+        className={cn(
+          "hidden sm:inline-flex text-[10px] font-semibold uppercase px-2 py-0.5 rounded border",
+          dataMode === "demo"
+            ? "text-pg-warning bg-warning-dim border-pg-warning/30"
+            : "text-pg-healthy bg-healthy-dim border-pg-healthy/30"
+        )}
+      >
+        {dataMode} mode
+      </span>
+
       <div className="flex-1" />
 
-      {/* System status pill */}
       <div className="hidden sm:flex items-center gap-1.5 text-xs">
         <span
           className={cn(
@@ -38,12 +55,9 @@ export function TopStatusBar() {
                 : "bg-pg-danger animate-pulse"
           )}
         />
-        <span className={cn("font-medium", systemStatus.color)}>
-          {systemStatus.label}
-        </span>
+        <span className={cn("font-medium", systemStatus.color)}>{systemStatus.label}</span>
       </div>
 
-      {/* Alert bell */}
       <Link
         href="/protected/alerts"
         className="relative p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -53,13 +67,12 @@ export function TopStatusBar() {
         <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-pg-danger rounded-full" />
       </Link>
 
-      {/* User menu */}
       <Link
         href="/protected/settings"
         className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
         aria-label="Account settings"
       >
-        LM
+        {userInitials}
       </Link>
     </header>
   );

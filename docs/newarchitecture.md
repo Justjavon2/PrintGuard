@@ -247,3 +247,12 @@ Use **OpenCV** for frame capture and the **OctoPrint REST API** for machine cont
 - Station records now support multiple camera source keys (`cameraSourceKeys`) with explicit `defaultCameraSourceKey`.
 - Backend accepts both `sourceKey` and legacy `sourceId` during migration to maintain compatibility.
 - Network camera registration supports `rtsp://` and `http(s)://` (MJPEG) sources for IP cameras and bridge streams.
+
+### Frontend Real-Data Notes (2026-03-31 update)
+
+- Protected pages now support dual data modes:
+  - `demo`: existing mock data paths remain available.
+  - `real`: Supabase-backed query adapters for `Dashboard`, `Fleet`, and `Printer Detail`.
+- Active organization selection is required for multi-org users and is cached in cookie + persisted preference logs.
+- Printer detail camera setup writes camera records (`videoSources`) and station camera assignments (`stationCameras`) to Supabase.
+- Backend camera endpoints enforce Supabase JWT and organization membership checks when Supabase env is configured.

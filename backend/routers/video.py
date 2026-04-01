@@ -18,6 +18,7 @@ from backend.services.videoSourceRegistry import (
     VideoSource,
     VideoSourceRegistry,
 )
+from backend.services.supabaseAuth import authService
 
 router = APIRouter(prefix="/api/video", tags=["video"])
 cameraManager = CameraManager()
@@ -104,13 +105,72 @@ def _resolveSource(
     return source
 
 
+def _enforceVideoAccess(
+    request: Request,
+    accessToken: Optional[str],
+    printerId: Optional[str],
+    sourceKey: Optional[str],
+    organizationId: Optional[str],
+) -> Optional[str]:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    if not authService.isEnabled():
+        return organizationId
+
+    resolvedOrganizationId = organizationId
+    if resolvedOrganizationId is None:
+        if printerId is not None:
+            resolvedOrganizationId = authService.resolveOrganizationIdForPrinter(authContext, printerId)
+        elif len(authContext.organizationIds) == 1:
+            resolvedOrganizationId = authContext.organizationIds[0]
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="organizationId or printerId is required for camera access",
+            )
+    authService.requireOrganizationMember(authContext, resolvedOrganizationId)
+
+    if printerId is not None and sourceKey is not None:
+        authService.ensureSourceAssignedToPrinter(
+            authContext=authContext,
+            organizationId=resolvedOrganizationId,
+            printerId=printerId,
+            sourceKey=sourceKey,
+        )
+
+    return resolvedOrganizationId
+
+
 @router.get("/sources", response_model=List[VideoSource])
-def listVideoSources(maxSources: int = Query(default=8, ge=1, le=32)) -> List[VideoSource]:
+def listVideoSources(
+    request: Request,
+    maxSources: int = Query(default=8, ge=1, le=32),
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
+) -> List[VideoSource]:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=None,
+        sourceKey=None,
+        organizationId=organizationId,
+    )
     return sourceRegistry.listSources(maxSources=maxSources)
 
 
 @router.post("/sources/network", response_model=NetworkSourceResponse, status_code=201)
-def createNetworkSource(payload: NetworkSourceCreate) -> NetworkSourceResponse:
+def createNetworkSource(
+    payload: NetworkSourceCreate,
+    request: Request,
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
+) -> NetworkSourceResponse:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=None,
+        sourceKey=None,
+        organizationId=organizationId,
+    )
     try:
         source = sourceRegistry.registerNetworkSource(
             sourceUrl=payload.sourceUrl,
@@ -122,7 +182,19 @@ def createNetworkSource(payload: NetworkSourceCreate) -> NetworkSourceResponse:
 
 
 @router.delete("/sources/network/{sourceKey}", response_model=DeleteNetworkSourceResponse)
-def deleteNetworkSource(sourceKey: str) -> DeleteNetworkSourceResponse:
+def deleteNetworkSource(
+    sourceKey: str,
+    request: Request,
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
+) -> DeleteNetworkSourceResponse:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=None,
+        sourceKey=None,
+        organizationId=organizationId,
+    )
     removed = sourceRegistry.removeNetworkSource(sourceKey)
     if not removed:
         raise HTTPException(status_code=404, detail="Network source not found")
@@ -131,17 +203,41 @@ def deleteNetworkSource(sourceKey: str) -> DeleteNetworkSourceResponse:
 
 
 @router.get("/preferences", response_model=VideoPreferences)
-def getVideoPreferences() -> VideoPreferences:
+def getVideoPreferences(
+    request: Request,
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
+) -> VideoPreferences:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=None,
+        sourceKey=None,
+        organizationId=organizationId,
+    )
     return preferencesStore.getPreferences()
 
 
 @router.put("/preferences", response_model=VideoPreferences)
-def updateVideoPreferences(payload: VideoPreferencesUpdateRequest) -> VideoPreferences:
+def updateVideoPreferences(
+    payload: VideoPreferencesUpdateRequest,
+    request: Request,
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
+) -> VideoPreferences:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=None,
+        sourceKey=None,
+        organizationId=organizationId,
+    )
     return preferencesStore.updatePreferences(payload)
 
 
 @router.get("/snapshot")
 def getSnapshot(
+    request: Request,
     sourceKey: Optional[str] = Query(default=None),
     sourceId: Optional[int] = Query(default=None, ge=0, le=31),
     printerId: Optional[str] = Query(default=None),
@@ -149,7 +245,16 @@ def getSnapshot(
     height: Optional[int] = Query(default=None, ge=1, le=4096),
     maxFps: int = Query(default=30, ge=1, le=60),
     maxSources: int = Query(default=8, ge=1, le=32),
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
 ) -> Response:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=printerId,
+        sourceKey=sourceKey,
+        organizationId=organizationId,
+    )
     resolvedSource = _resolveSource(
         sourceKey=sourceKey,
         sourceId=sourceId,
@@ -180,7 +285,16 @@ async def streamVideo(
     printerId: Optional[str] = Query(default=None),
     fps: int = Query(default=10, ge=1, le=60),
     maxSources: int = Query(default=8, ge=1, le=32),
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
 ) -> StreamingResponse:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=printerId,
+        sourceKey=sourceKey,
+        organizationId=organizationId,
+    )
     resolvedSource = _resolveSource(
         sourceKey=sourceKey,
         sourceId=sourceId,
@@ -216,6 +330,7 @@ async def streamVideo(
 
 @router.get("/analyze", response_model=VideoAnalysisResponse)
 def analyzeFrame(
+    request: Request,
     sourceKey: Optional[str] = Query(default=None),
     sourceId: Optional[int] = Query(default=None, ge=0, le=31),
     printerId: Optional[str] = Query(default=None),
@@ -223,7 +338,16 @@ def analyzeFrame(
     height: Optional[int] = Query(default=None, ge=1, le=4096),
     maxFps: int = Query(default=30, ge=1, le=60),
     maxSources: int = Query(default=8, ge=1, le=32),
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
 ) -> VideoAnalysisResponse:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=printerId,
+        sourceKey=sourceKey,
+        organizationId=organizationId,
+    )
     resolvedSource = _resolveSource(
         sourceKey=sourceKey,
         sourceId=sourceId,
@@ -250,7 +374,19 @@ def analyzeFrame(
 
 
 @router.post("/analyze/batch", response_model=VideoBatchResponse)
-def analyzeBatch(payload: VideoBatchRequest) -> VideoBatchResponse:
+def analyzeBatch(
+    payload: VideoBatchRequest,
+    request: Request,
+    organizationId: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
+) -> VideoBatchResponse:
+    _enforceVideoAccess(
+        request=request,
+        accessToken=accessToken,
+        printerId=None,
+        sourceKey=None,
+        organizationId=organizationId,
+    )
     requestedSourceKeys: List[str] = []
     requestedSourceKeys.extend(payload.sourceKeys)
     requestedSourceKeys.extend([f"local:{sourceId}" for sourceId in payload.sourceIds])

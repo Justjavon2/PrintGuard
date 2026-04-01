@@ -30,7 +30,6 @@ export interface Printer {
   detectedLabel: DefectLabel;
   lastFrameAt: string; // ISO
   cameraConnected: boolean;
-  octoprintConnected: boolean;
   latencyMs: number;
   filamentUsedG: number;
   estimatedTimeLeftMin: number;
@@ -94,7 +93,6 @@ export const MOCK_PRINTERS: Printer[] = [
     detectedLabel: "SPAGHETTI",
     lastFrameAt: new Date(Date.now() - 4000).toISOString(),
     cameraConnected: true,
-    octoprintConnected: true,
     latencyMs: 38,
     filamentUsedG: 42,
     estimatedTimeLeftMin: 94,
@@ -112,7 +110,6 @@ export const MOCK_PRINTERS: Printer[] = [
     detectedLabel: "WARPING",
     lastFrameAt: new Date(Date.now() - 2000).toISOString(),
     cameraConnected: true,
-    octoprintConnected: true,
     latencyMs: 52,
     filamentUsedG: 18,
     estimatedTimeLeftMin: 210,
@@ -130,7 +127,6 @@ export const MOCK_PRINTERS: Printer[] = [
     detectedLabel: "GOOD",
     lastFrameAt: new Date(Date.now() - 1500).toISOString(),
     cameraConnected: true,
-    octoprintConnected: true,
     latencyMs: 29,
     filamentUsedG: 88,
     estimatedTimeLeftMin: 31,
@@ -148,7 +144,6 @@ export const MOCK_PRINTERS: Printer[] = [
     detectedLabel: "SPAGHETTI",
     lastFrameAt: new Date(Date.now() - 120000).toISOString(),
     cameraConnected: true,
-    octoprintConnected: true,
     latencyMs: 44,
     filamentUsedG: 12,
     estimatedTimeLeftMin: 58,
@@ -166,7 +161,6 @@ export const MOCK_PRINTERS: Printer[] = [
     detectedLabel: "GOOD",
     lastFrameAt: new Date(Date.now() - 3600000).toISOString(),
     cameraConnected: false,
-    octoprintConnected: false,
     latencyMs: 0,
     filamentUsedG: 0,
     estimatedTimeLeftMin: 0,
@@ -184,7 +178,6 @@ export const MOCK_PRINTERS: Printer[] = [
     detectedLabel: "GOOD",
     lastFrameAt: new Date(Date.now() - 800).toISOString(),
     cameraConnected: true,
-    octoprintConnected: true,
     latencyMs: 61,
     filamentUsedG: 9,
     estimatedTimeLeftMin: 320,

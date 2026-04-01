@@ -16,6 +16,22 @@ export type ConfigResult =
   };
 
 async function getSupabaseConfig(): Promise<ConfigResult> {
+  const directUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const directKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
+  // Prefer direct frontend envs when available.
+  if (directUrl && directKey) {
+    return {
+      success: true,
+      config: {
+        NEXT_PUBLIC_SUPABASE_URL: directUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: directKey,
+      },
+    };
+  }
+
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!apiUrl) {
@@ -49,10 +65,14 @@ async function getSupabaseConfig(): Promise<ConfigResult> {
     const data = await res.json();
 
     // Validate the response has required fields
-    if (!data.NEXT_PUBLIC_SUPABASE_URL || !data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    const resolvedKey =
+      data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
+    if (!data.NEXT_PUBLIC_SUPABASE_URL || !resolvedKey) {
       return {
         success: false,
-        error: "Backend is missing Supabase environment variables. Check backend/.env file.",
+        error: "Supabase environment variables are missing. Set frontend/PG/.env.local or backend/.env.",
         errorType: "MISSING_ENV_VARS",
       };
     }
@@ -61,7 +81,7 @@ async function getSupabaseConfig(): Promise<ConfigResult> {
       success: true,
       config: {
         NEXT_PUBLIC_SUPABASE_URL: data.NEXT_PUBLIC_SUPABASE_URL,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: data.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: resolvedKey,
       },
     };
   } catch (error) {
@@ -114,4 +134,3 @@ export async function createClient() {
 export async function getConfigForClient(): Promise<ConfigResult> {
   return getSupabaseConfig();
 }
-

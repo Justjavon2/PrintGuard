@@ -37,13 +37,26 @@ export default async function RootLayout({
   
   const devMode = process.env.DEV_MODE === "true" || isDemoBypass;
 
-  // ── DEV MODE: skip Supabase entirely ─────────────────────────────
+  // ── DEV MODE: lighter layout but still provide SupabaseProvider
+  //    so auth pages (LoginForm, etc.) that call useSupabase() work. ──
   if (devMode) {
+    const configResult = await getConfigForClient();
+    const hasSupabase = configResult.success;
+
     return (
       <html lang="en" suppressHydrationWarning>
         <body className={`${geistSans.className} antialiased`}>
           <BackendHealthProvider>
-            {children}
+            {hasSupabase ? (
+              <SupabaseProvider
+                supabaseUrl={configResult.config.NEXT_PUBLIC_SUPABASE_URL}
+                supabaseKey={configResult.config.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+              >
+                {children}
+              </SupabaseProvider>
+            ) : (
+              children
+            )}
             <BackendStatusToast />
           </BackendHealthProvider>
         </body>

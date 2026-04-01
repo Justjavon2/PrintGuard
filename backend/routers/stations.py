@@ -6,13 +6,14 @@ import time
 from typing import Generator, List, Optional
 
 import cv2
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.routers import video
 from backend.services.cameraManager import CameraManager
 from backend.services.stationRegistry import PrinterStation, StationRegistry
+from backend.services.supabaseAuth import authService
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 
@@ -101,12 +102,18 @@ def _ensureSourceWorker(sourceKey: str) -> None:
 
 
 @router.get("/", response_model=List[StationResponse])
-def listStations() -> List[StationResponse]:
+def listStations(request: Request, accessToken: Optional[str] = Query(default=None)) -> List[StationResponse]:
+    authService.requireAuth(request, accessToken=accessToken)
     return [StationResponse(**station.model_dump()) for station in _reg().list_all()]
 
 
 @router.post("/", response_model=StationResponse, status_code=201)
-def createStation(payload: StationCreateRequest) -> StationResponse:
+def createStation(
+    payload: StationCreateRequest,
+    request: Request,
+    accessToken: Optional[str] = Query(default=None),
+) -> StationResponse:
+    authService.requireAuth(request, accessToken=accessToken)
     cameraSourceKeys, defaultCameraSourceKey, cameraSourceId = _normaliseStationCameraInput(payload)
     for sourceKey in cameraSourceKeys:
         source = video.sourceRegistry.getSourceByKey(sourceKey, maxSources=32)
@@ -126,7 +133,17 @@ def createStation(payload: StationCreateRequest) -> StationResponse:
 
 
 @router.get("/{stationId}", response_model=StationResponse)
-def getStation(stationId: str) -> StationResponse:
+def getStation(
+    stationId: str,
+    request: Request,
+    accessToken: Optional[str] = Query(default=None),
+) -> StationResponse:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    try:
+        authService.resolveOrganizationIdForStation(authContext, stationId)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -134,7 +151,18 @@ def getStation(stationId: str) -> StationResponse:
 
 
 @router.put("/{stationId}/cameras", response_model=StationResponse)
-def updateStationCameras(stationId: str, payload: StationUpdateCamerasRequest) -> StationResponse:
+def updateStationCameras(
+    stationId: str,
+    payload: StationUpdateCamerasRequest,
+    request: Request,
+    accessToken: Optional[str] = Query(default=None),
+) -> StationResponse:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    try:
+        authService.resolveOrganizationIdForStation(authContext, stationId)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -158,7 +186,17 @@ def updateStationCameras(stationId: str, payload: StationUpdateCamerasRequest) -
 
 
 @router.delete("/{stationId}")
-def deleteStation(stationId: str) -> dict:
+def deleteStation(
+    stationId: str,
+    request: Request,
+    accessToken: Optional[str] = Query(default=None),
+) -> dict:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    try:
+        authService.resolveOrganizationIdForStation(authContext, stationId)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -172,7 +210,18 @@ def _encodeJpeg(frame: object) -> Optional[bytes]:
 
 
 @router.get("/{stationId}/snapshot")
-def stationSnapshot(stationId: str, sourceKey: Optional[str] = Query(default=None)) -> Response:
+def stationSnapshot(
+    stationId: str,
+    request: Request,
+    sourceKey: Optional[str] = Query(default=None),
+    accessToken: Optional[str] = Query(default=None),
+) -> Response:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    try:
+        authService.resolveOrganizationIdForStation(authContext, stationId)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -200,9 +249,17 @@ def stationSnapshot(stationId: str, sourceKey: Optional[str] = Query(default=Non
 @router.get("/{stationId}/stream")
 def stationStream(
     stationId: str,
+    request: Request,
     sourceKey: Optional[str] = Query(default=None),
     fps: int = Query(default=10, ge=1, le=60),
+    accessToken: Optional[str] = Query(default=None),
 ) -> StreamingResponse:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    try:
+        authService.resolveOrganizationIdForStation(authContext, stationId)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -262,7 +319,17 @@ def _sendSerial(station: PrinterStation, command: str) -> dict:
 
 
 @router.post("/{stationId}/pause")
-def stationPause(stationId: str) -> dict:
+def stationPause(
+    stationId: str,
+    request: Request,
+    accessToken: Optional[str] = Query(default=None),
+) -> dict:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    try:
+        authService.resolveOrganizationIdForStation(authContext, stationId)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -270,7 +337,17 @@ def stationPause(stationId: str) -> dict:
 
 
 @router.post("/{stationId}/stop")
-def stationStop(stationId: str) -> dict:
+def stationStop(
+    stationId: str,
+    request: Request,
+    accessToken: Optional[str] = Query(default=None),
+) -> dict:
+    authContext = authService.requireAuth(request, accessToken=accessToken)
+    try:
+        authService.resolveOrganizationIdForStation(authContext, stationId)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
     station = _reg().get(stationId)
     if station is None:
         raise HTTPException(status_code=404, detail="Station not found")

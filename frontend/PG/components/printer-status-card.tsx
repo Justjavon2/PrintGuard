@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Wifi, WifiOff, Camera, CameraOff } from "lucide-react";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { Camera, CameraOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Printer } from "@/lib/mock-data";
 import { formatRelativeTime } from "@/lib/mock-data";
@@ -8,11 +7,12 @@ import { formatRelativeTime } from "@/lib/mock-data";
 interface PrinterStatusCardProps {
   printer: Printer;
   className?: string;
+  basePath?: "/protected" | "/demo";
 }
 
-export function PrinterStatusCard({ printer, className }: PrinterStatusCardProps) {
+export function PrinterStatusCard({ printer, className, basePath = "/protected" }: PrinterStatusCardProps) {
   return (
-    <Link href={`/protected/printers/${printer.id}`}>
+    <Link href={`${basePath}/printers/${printer.id}`}>
       <div
         className={cn(
           "rounded-[14px] border-transparent p-4 sm:p-5 flex flex-col gap-4 cursor-pointer hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200 bg-[#D93D38] text-white",
@@ -72,11 +72,6 @@ export function PrinterStatusCard({ printer, className }: PrinterStatusCardProps
               <Camera size={14} className="text-white" />
             ) : (
               <CameraOff size={14} className="text-white/50" />
-            )}
-            {printer.octoprintConnected ? (
-              <Wifi size={14} className="text-white" />
-            ) : (
-              <WifiOff size={14} className="text-white/50" />
             )}
           </div>
           <span>{formatRelativeTime(printer.lastFrameAt)}</span>

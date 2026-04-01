@@ -15,7 +15,7 @@ This document provides a breakdown of each page in the PrintGuard frontend appli
 **Purpose:** A detailed administrative view of all connected printers, organized by physical laboratory grouping.
 **Important Elements:**
 - **Grouped Laboratory Tables:** Printers are grouped by their physical `lab` (e.g., "DSU Makerspace").
-- **Table Data:** Displays connection health for each printer's Camera feed, OctoPrint connectivity, and the timestamp of the last captured frame.
+- **Table Data:** Displays connection health for each printer's camera feed and the timestamp of the last captured frame.
 - **Add Printer Button:** CTA for registering new printers to the PrintGuard system.
 
 ### 3. Individual Printer Detail (`/protected/printers/[id]`)

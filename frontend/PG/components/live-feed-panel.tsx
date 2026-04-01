@@ -6,6 +6,7 @@ import type { Printer } from "@/lib/mock-data";
 import { formatRelativeTime, getConfidenceLevel } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Wifi, Clock, AlertTriangle, ChevronRight } from "lucide-react";
+import { useOptionalSupabase } from "@/components/supabase-provider";
 
 interface VideoSource {
   sourceKey: string;
@@ -24,6 +25,12 @@ interface VideoPreferences {
 interface LiveFeedPanelProps {
   printer: Printer;
   className?: string;
+  organizationId?: string | null;
+  streamPrinterId?: string | null;
+  initialSources?: VideoSource[];
+  initialSelectedSourceKeys?: string[];
+  disableBackendSourceLoading?: boolean;
+  hideSourceControls?: boolean;
 }
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -66,13 +73,24 @@ function orderedSourceKeys(sources: VideoSource[], defaultKey: string | null): s
   return [defaultSource.sourceKey, ...others.map((item) => item.sourceKey)];
 }
 
-export function LiveFeedPanel({ printer, className }: LiveFeedPanelProps) {
+export function LiveFeedPanel({
+  printer,
+  className,
+  organizationId = null,
+  streamPrinterId = printer.id,
+  initialSources = [],
+  initialSelectedSourceKeys = [],
+  disableBackendSourceLoading = false,
+  hideSourceControls = false,
+}: LiveFeedPanelProps) {
+  const supabase = useOptionalSupabase();
   const confLevel = getConfidenceLevel(printer.confidence);
   const [sources, setSources] = useState<VideoSource[]>([]);
   const [selectedSourceKeys, setSelectedSourceKeys] = useState<string[]>([]);
   const [windowStart, setWindowStart] = useState<number>(0);
   const [loadingSources, setLoadingSources] = useState<boolean>(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const feedBorder = {
     danger: "border-pg-danger/60 glow-danger",
@@ -83,13 +101,61 @@ export function LiveFeedPanel({ printer, className }: LiveFeedPanelProps) {
   useEffect(() => {
     let isCancelled = false;
 
+    async function loadSessionToken() {
+      if (supabase === null) {
+        setAccessToken(null);
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      if (isCancelled) {
+        return;
+      }
+      setAccessToken(data.session?.access_token ?? null);
+    }
+
+    loadSessionToken();
+    const subscription =
+      supabase === null
+        ? null
+        : supabase.auth.onAuthStateChange((_event, session) => {
+            setAccessToken(session?.access_token ?? null);
+          }).data.subscription;
+
+    return () => {
+      isCancelled = true;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (disableBackendSourceLoading) {
+      setSources(initialSources);
+      setSelectedSourceKeys(initialSelectedSourceKeys);
+      setWindowStart(0);
+      setLoadingSources(false);
+      setLoadingError(null);
+      return;
+    }
+
+    let isCancelled = false;
+
     async function loadSources() {
       try {
         setLoadingSources(true);
         setLoadingError(null);
+        const authHeaders: HeadersInit =
+          accessToken === null ? {} : { Authorization: `Bearer ${accessToken}` };
+        const organizationQuery =
+          organizationId === null ? "" : `&organizationId=${encodeURIComponent(organizationId)}`;
         const [sourcesResponse, preferencesResponse] = await Promise.all([
-          fetch(`${apiBaseUrl}/api/video/sources`),
-          fetch(`${apiBaseUrl}/api/video/preferences`),
+          fetch(`${apiBaseUrl}/api/video/sources?maxSources=8${organizationQuery}`, {
+            headers: authHeaders,
+          }),
+          fetch(`${apiBaseUrl}/api/video/preferences`, {
+            headers: authHeaders,
+          }),
         ]);
         if (!sourcesResponse.ok) {
           throw new Error("Unable to load camera sources");
@@ -124,7 +190,14 @@ export function LiveFeedPanel({ printer, className }: LiveFeedPanelProps) {
     return () => {
       isCancelled = true;
     };
-  }, [printer.id]);
+  }, [
+    accessToken,
+    disableBackendSourceLoading,
+    initialSelectedSourceKeys,
+    initialSources,
+    organizationId,
+    printer.id,
+  ]);
 
   const visibleSourceKeys = useMemo(() => {
     if (selectedSourceKeys.length === 0) {
@@ -149,9 +222,15 @@ export function LiveFeedPanel({ printer, className }: LiveFeedPanelProps) {
         [printer.id]: sourceKey,
       },
     };
+    if (!accessToken) {
+      return;
+    }
     await fetch(`${apiBaseUrl}/api/video/preferences`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
       body: JSON.stringify(payload),
     });
   }
@@ -232,7 +311,7 @@ export function LiveFeedPanel({ printer, className }: LiveFeedPanelProps) {
         {visibleSources.map((source, sourceIndex) => (
           <div key={source.sourceKey} className="relative rounded-lg overflow-hidden border border-border/30 bg-black min-h-[230px]">
             <img
-              src={`${apiBaseUrl}/api/video/stream?sourceKey=${encodeURIComponent(source.sourceKey)}&printerId=${encodeURIComponent(printer.id)}`}
+              src={`${apiBaseUrl}/api/video/stream?sourceKey=${encodeURIComponent(source.sourceKey)}${streamPrinterId ? `&printerId=${encodeURIComponent(streamPrinterId)}` : ""}${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ""}${accessToken ? `&accessToken=${encodeURIComponent(accessToken)}` : ""}`}
               alt={`Live Camera Feed for ${printer.name} (${source.displayName})`}
               className="absolute inset-0 w-full h-full object-cover z-10"
             />
@@ -255,7 +334,8 @@ export function LiveFeedPanel({ printer, className }: LiveFeedPanelProps) {
         ))}
       </div>
 
-      <div className="px-4 py-3 border-t border-border bg-card/60">
+      {!hideSourceControls ? (
+        <div className="px-4 py-3 border-t border-border bg-card/60">
         <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-2">Camera Controls</p>
         <div className="flex flex-wrap gap-2">
           {sources.map((source) => (
@@ -286,6 +366,7 @@ export function LiveFeedPanel({ printer, className }: LiveFeedPanelProps) {
           ))}
         </div>
       </div>
+      ) : null}
 
       <div className="flex items-center justify-between px-4 py-2 border-t border-border text-xs text-muted-foreground bg-card/60">
         <div className="flex items-center gap-2">

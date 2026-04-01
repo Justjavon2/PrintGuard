@@ -104,17 +104,26 @@ class VideoSourceRegistry:
 
     def _probeLocalSources(self, maxSources: int) -> List[VideoSource]:
         sources: List[VideoSource] = []
+        consecutiveFailures = 0
+        maxConsecutiveFailures = 2  # stop after 2 misses to avoid OpenCV spam
         for sourceIndex in range(maxSources):
             capture = cv2.VideoCapture(sourceIndex)
             try:
                 if not capture.isOpened():
+                    consecutiveFailures += 1
+                    if consecutiveFailures >= maxConsecutiveFailures:
+                        break
                     continue
                 ok, _ = capture.read()
                 if not ok:
+                    consecutiveFailures += 1
+                    if consecutiveFailures >= maxConsecutiveFailures:
+                        break
                     continue
             finally:
                 capture.release()
 
+            consecutiveFailures = 0
             isExternal = sourceIndex != 0
             if platform.system() == "Darwin" and sourceIndex == 0:
                 displayName = "Mac Built-in Camera (Default)"

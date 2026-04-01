@@ -1,21 +1,32 @@
-import { MOCK_PRINTERS } from "@/lib/mock-data";
+import { formatRelativeTime } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Camera, CameraOff, Wifi, WifiOff, Plus } from "lucide-react";
+import { Camera, CameraOff, Plus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/mock-data";
+import { getProtectedContext } from "@/lib/data/context";
+import { loadRealPrinters } from "@/lib/data/real-data";
+import { redirect } from "next/navigation";
 
-export default function FleetPage() {
-  const labs = [...new Set(MOCK_PRINTERS.map((p) => p.lab))];
+export default async function FleetPage() {
+  const context = await getProtectedContext();
+  if (context.isDemoMode) {
+    redirect("/demo/fleet");
+  }
+  if (!context.activeOrganizationId) {
+    redirect("/protected/select-org");
+  }
+
+  const printers = (await loadRealPrinters(context.supabase, context.activeOrganizationId)).printers;
+
+  const labs = [...new Set(printers.map((printer) => printer.lab))];
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">Fleet Management</h1>
           <p className="text-sm text-muted-foreground">
-            {MOCK_PRINTERS.length} printers across {labs.length} labs
+            {printers.length} printers across {labs.length} labs
           </p>
         </div>
         <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
@@ -24,21 +35,18 @@ export default function FleetPage() {
         </button>
       </div>
 
-      {/* Group by lab */}
       {labs.map((lab) => {
-        const labPrinters = MOCK_PRINTERS.filter((p) => p.lab === lab);
+        const labPrinters = printers.filter((printer) => printer.lab === lab);
         return (
           <section key={lab} className="space-y-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
               {lab}
             </h2>
             <div className="bg-[hsl(0,80%,99%)] rounded-[14px] border border-border overflow-hidden shadow-sm">
-              {/* Table header */}
-              <div className="hidden sm:grid grid-cols-[1fr_120px_90px_90px_90px_80px] gap-4 px-4 py-2.5 border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+              <div className="hidden sm:grid grid-cols-[1fr_120px_90px_90px_80px] gap-4 px-4 py-2.5 border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
                 <span>Printer</span>
                 <span>Status</span>
                 <span className="flex items-center gap-1"><Camera size={10} /> Camera</span>
-                <span className="flex items-center gap-1"><Wifi size={10} /> OctoPrint</span>
                 <span>Last Frame</span>
                 <span>Actions</span>
               </div>
@@ -47,20 +55,17 @@ export default function FleetPage() {
                 {labPrinters.map((printer) => (
                   <div
                     key={printer.id}
-                    className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_90px_90px_80px] gap-2 sm:gap-4 px-4 py-3.5 hover:bg-surface-2 transition-colors"
+                    className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_90px_80px] gap-2 sm:gap-4 px-4 py-3.5 hover:bg-surface-2 transition-colors"
                   >
-                    {/* Printer name */}
                     <div>
                       <p className="text-sm font-medium text-foreground">{printer.name}</p>
                       <p className="text-[11px] text-muted-foreground">{printer.model}</p>
                     </div>
 
-                    {/* Status */}
                     <div className="self-center">
                       <StatusBadge status={printer.status} size="sm" />
                     </div>
 
-                    {/* Camera */}
                     <div className="self-center flex items-center gap-1.5 text-xs">
                       {printer.cameraConnected ? (
                         <Camera size={13} className="text-pg-healthy" />
@@ -75,27 +80,10 @@ export default function FleetPage() {
                       </span>
                     </div>
 
-                    {/* OctoPrint */}
-                    <div className="self-center flex items-center gap-1.5 text-xs">
-                      {printer.octoprintConnected ? (
-                        <Wifi size={13} className="text-pg-healthy" />
-                      ) : (
-                        <WifiOff size={13} className="text-pg-offline" />
-                      )}
-                      <span className={cn(
-                        "text-[11px]",
-                        printer.octoprintConnected ? "text-pg-healthy" : "text-pg-offline"
-                      )}>
-                        {printer.octoprintConnected ? "OK" : "Off"}
-                      </span>
-                    </div>
-
-                    {/* Last frame */}
                     <p className="text-[11px] text-muted-foreground self-center">
                       {formatRelativeTime(printer.lastFrameAt)}
                     </p>
 
-                    {/* Link */}
                     <div className="self-center">
                       <Link
                         href={`/protected/printers/${printer.id}`}

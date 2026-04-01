@@ -46,7 +46,7 @@ export function ConfigError({ errorType, errorMessage }: ConfigErrorProps) {
                     steps: [
                         "Check that backend/.env file exists",
                         "Ensure NEXT_PUBLIC_SUPABASE_URL is set",
-                        "Ensure NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is set",
+                        "Ensure NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY is set",
                         "Restart the backend server after updating .env",
                     ],
                 };

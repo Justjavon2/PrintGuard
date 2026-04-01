@@ -25,18 +25,30 @@ All routes are served by the FastAPI backend (default: `http://localhost:8000`).
 ## Video (`/api/video`)
 
 Endpoints for discovering cameras, grabbing snapshots, streaming live feeds, and running frame analysis.
+All `/api/video/*` routes require Supabase auth when Supabase env vars are configured in backend runtime.
+Pass bearer token via `Authorization: Bearer <accessToken>` or `accessToken` query param for MJPEG `<img>` usage.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/video/sources` | Returns normalized camera metadata for local + network sources. Query param: `maxSources` (default 8, max 32). Source object fields: `sourceKey`, `sourceType` (`local`/`rtsp`/`httpMjpeg`), `displayName`, `sourceValue`, `isExternal`, `isNetwork`. |
-| `POST` | `/api/video/sources/network` | Registers a network camera source. Body: `{"sourceUrl": "rtsp://... or http(s)://...", "displayName": "optional"}`. |
-| `DELETE` | `/api/video/sources/network/{sourceKey}` | Removes a previously registered network source and stops its worker. |
-| `GET` | `/api/video/preferences` | Returns camera default preferences: `preferredDefaultSourceKey` + optional `preferredByPrinterId` map. |
-| `PUT` | `/api/video/preferences` | Updates camera default preferences. Body supports `preferredDefaultSourceKey` and/or `preferredByPrinterId`. |
-| `GET` | `/api/video/snapshot` | Returns one JPEG frame. Query params: `sourceKey` (preferred), legacy `sourceId` (backward compatible), optional `printerId`, `width`, `height`, `maxFps`. |
-| `GET` | `/api/video/stream` | Opens MJPEG stream. Query params: `sourceKey` (preferred), legacy `sourceId` (backward compatible), optional `printerId`, `fps`. |
+| `GET` | `/api/video/sources` | Returns normalized camera metadata for local + network sources. Query params: `maxSources` (default 8, max 32), `organizationId` (required when auth enabled). |
+| `POST` | `/api/video/sources/network` | Registers a network camera source. Body: `{"sourceUrl": "rtsp://... or http(s)://...", "displayName": "optional"}`. Query param: `organizationId` (required when auth enabled). |
+| `DELETE` | `/api/video/sources/network/{sourceKey}` | Removes a previously registered network source and stops its worker. Query param: `organizationId` (required when auth enabled). |
+| `GET` | `/api/video/preferences` | Returns camera default preferences: `preferredDefaultSourceKey` + optional `preferredByPrinterId` map. Query param: `organizationId` (required when auth enabled). |
+| `PUT` | `/api/video/preferences` | Updates camera default preferences. Body supports `preferredDefaultSourceKey` and/or `preferredByPrinterId`. Query param: `organizationId` (required when auth enabled). |
+| `GET` | `/api/video/snapshot` | Returns one JPEG frame. Query params: `sourceKey` (preferred), legacy `sourceId`, optional `printerId`, optional `organizationId`, `width`, `height`, `maxFps`. With auth enabled, organization/printer scope is enforced. |
+| `GET` | `/api/video/stream` | Opens MJPEG stream. Query params: `sourceKey` (preferred), legacy `sourceId`, optional `printerId`, optional `organizationId`, `fps`, optional `accessToken`. |
 | `GET` | `/api/video/analyze` | Grabs frame and runs placeholder YOLO pipeline. Query params mirror `/snapshot`. Returns `sourceKey`, `timestamp`, `yoloConfigured`, `detections`. |
-| `POST` | `/api/video/analyze/batch` | Batch analyze by `sourceKeys` and/or legacy `sourceIds`. Body: `{"sourceKeys": [], "sourceIds": [], "width", "height", "maxFps"}`. |
+| `POST` | `/api/video/analyze/batch` | Batch analyze by `sourceKeys` and/or legacy `sourceIds`. Body: `{"sourceKeys": [], "sourceIds": [], "width", "height", "maxFps"}`. Query param: `organizationId` (required when auth enabled). |
+
+---
+
+## Notifications (`/api/notifications`)
+
+Notification and guard-mode orchestration endpoints.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/notifications/guard/start` | Starts placeholder guard mode (YOLO runtime state placeholder) for a specific printer and sends a guard-start confirmation email to the authenticated user. Body: `{"organizationId":"...","printerId":"...","organizationName":"optional label"}`. Fails if printer has no assigned cameras. Requires bearer auth. |
 
 ---
 
@@ -55,6 +67,7 @@ Direct serial (pyserial) control of 3D printers via G-code commands.
 ## Stations (`/api/stations`)
 
 Higher-level abstraction that links a camera to a printer as a named **station**. Provides CRUD management plus convenience shortcuts for streaming and printer control per station.
+All `/api/stations/*` routes require Supabase auth when Supabase env vars are configured.
 
 ### CRUD
 
