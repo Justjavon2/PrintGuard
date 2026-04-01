@@ -1,7 +1,14 @@
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import video, printer, stations
+backendDir = Path(__file__).resolve().parent
+load_dotenv(backendDir / ".env", override=False)
+load_dotenv(backendDir / ".env.local", override=True)
+
+from backend.routers import notifications, video, printer, stations
 from backend.database import db
 from backend.services.cameraManager import CameraManager
 from backend.services.stationRegistry import StationRegistry
@@ -45,6 +52,7 @@ app.include_router(db.router)
 app.include_router(video.router)
 app.include_router(printer.router)
 app.include_router(stations.router)
+app.include_router(notifications.router)
 
 
 @app.on_event("shutdown")

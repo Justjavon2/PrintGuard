@@ -14,6 +14,7 @@ This is the implementation backlog for productionizing PrintGuard for industrial
 ## P0: Critical Product Functionality
 
 ### 1) Notifications: Email + Browser Push
+- [x] Add initial `Guard this Print` email flow (camera-gated, placeholder YOLO running state).
 - [ ] Build notification orchestration service in backend (`incident -> notificationEvents` pipeline).
 - [ ] Implement email sender with provider abstraction (`Resend` or SMTP fallback), retries, and dead-letter status.
 - [ ] Implement browser push notifications in frontend (permission flow + service worker + Supabase-backed preferences).

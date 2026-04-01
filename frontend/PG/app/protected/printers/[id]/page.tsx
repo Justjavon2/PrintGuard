@@ -12,6 +12,7 @@ import { loadSinglePrinter } from "@/lib/data/real-data";
 import { CameraSourceForm } from "@/components/camera-source-form";
 import {
   deleteCameraFromPrinterAction,
+  startGuardForPrinterAction,
   setDefaultPrinterCameraAction,
 } from "@/app/protected/printers/[id]/actions";
 
@@ -247,6 +248,39 @@ export default async function PrinterDetailPage({ params }: Props) {
         </div>
 
         <div className="lg:col-span-2 space-y-4">
+          <div className="bg-[hsl(0,80%,99%)] rounded-[14px] border border-border p-4 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guard Controls</p>
+            <form action={startGuardForPrinterAction} className="space-y-2">
+              <input type="hidden" name="organizationId" value={activeOrganizationId} />
+              <input
+                type="hidden"
+                name="organizationName"
+                value={context.activeOrganizationName ?? activeOrganizationId}
+              />
+              <input type="hidden" name="printerId" value={printer.id} />
+              <button
+                type="submit"
+                disabled={assignedSources.length < 1}
+                className={cn(
+                  "w-full px-3 py-2 rounded-md border text-xs font-semibold",
+                  assignedSources.length < 1
+                    ? "border-border text-muted-foreground cursor-not-allowed"
+                    : "border-border hover:bg-accent text-foreground"
+                )}
+              >
+                Guard this Print
+              </button>
+            </form>
+            {assignedSources.length < 1 ? (
+              <p className="text-[11px] text-muted-foreground">
+                Assign at least one camera to this printer before starting guard mode.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Starts placeholder guard mode and sends you an email confirmation.
+              </p>
+            )}
+          </div>
           <DetectionConfidenceCard printer={printer} />
           {activeAlert ? <IncidentEvidenceCard alert={activeAlert} /> : null}
           <ActionBar status={printer.status} printerId={printer.id} />

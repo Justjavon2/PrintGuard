@@ -42,6 +42,16 @@ Pass bearer token via `Authorization: Bearer <accessToken>` or `accessToken` que
 
 ---
 
+## Notifications (`/api/notifications`)
+
+Notification and guard-mode orchestration endpoints.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/notifications/guard/start` | Starts placeholder guard mode (YOLO runtime state placeholder) for a specific printer and sends a guard-start confirmation email to the authenticated user. Body: `{"organizationId":"...","printerId":"...","organizationName":"optional label"}`. Fails if printer has no assigned cameras. Requires bearer auth. |
+
+---
+
 ## Printer (`/api/printer`)
 
 Direct serial (pyserial) control of 3D printers via G-code commands.

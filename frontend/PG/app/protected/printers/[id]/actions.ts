@@ -164,6 +164,10 @@ async function getUserAndValidateOrg(organizationId: string): Promise<string> {
   return user.id;
 }
 
+function getApiBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+}
+
 function sourceTypeFromFormValue(
   value: FormDataEntryValue | null
 ): "local" | "rtsp" | "httpMjpeg" {
@@ -385,5 +389,63 @@ export async function deleteCameraFromPrinterAction(formData: FormData): Promise
   revalidatePath(`/protected/printers/${printerId}`);
   revalidatePath("/protected/dashboard");
   revalidatePath("/protected/fleet");
+  redirect(`/protected/printers/${printerId}`);
+}
+
+export async function startGuardForPrinterAction(formData: FormData): Promise<void> {
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const organizationName = String(formData.get("organizationName") ?? "");
+  const printerId = String(formData.get("printerId") ?? "");
+
+  if (!organizationId || !printerId) {
+    redirect(`/protected/printers/${printerId}`);
+  }
+
+  await getUserAndValidateOrg(organizationId);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userEmail = user?.email ?? null;
+  if (!userEmail) {
+    throw new Error("Signed-in user email is missing");
+  }
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const accessToken = session?.access_token ?? null;
+  if (!accessToken) {
+    throw new Error("Missing Supabase access token for guard action");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/notifications/guard/start`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      organizationId,
+      organizationName: organizationName || null,
+      printerId,
+      userEmail,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let responseDetail = `HTTP ${response.status}`;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload?.detail) {
+        responseDetail = payload.detail;
+      }
+    } catch {
+      // keep default response detail
+    }
+    throw new Error(`Failed to start guard mode: ${responseDetail}`);
+  }
+
+  revalidatePath(`/protected/printers/${printerId}`);
   redirect(`/protected/printers/${printerId}`);
 }
