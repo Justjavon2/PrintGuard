@@ -11,7 +11,11 @@ interface TopStatusBarProps {
   userInitials: string;
 }
 
-export function TopStatusBar({ activeOrganizationName, dataMode, userInitials }: TopStatusBarProps) {
+export function TopStatusBar({
+  activeOrganizationName,
+  dataMode,
+  userInitials,
+}: TopStatusBarProps) {
   const { status } = useBackendHealth();
 
   const systemStatus =
@@ -27,7 +31,9 @@ export function TopStatusBar({ activeOrganizationName, dataMode, userInitials }:
         href="/protected/select-org"
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
-        <span className="font-medium text-foreground">{activeOrganizationName ?? "Select Organization"}</span>
+        <span className="font-medium text-foreground">
+          {activeOrganizationName ?? "Select Organization"}
+        </span>
         <ChevronDown size={14} />
       </Link>
 

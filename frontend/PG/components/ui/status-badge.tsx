@@ -9,7 +9,7 @@ type StatusConfig = {
   borderClass: string;
 };
 
-const STATUS_CONFIG: Record<PrinterStatus | "monitoring", StatusConfig> = {
+const statusConfig: Record<PrinterStatus | "monitoring", StatusConfig> = {
   monitoring: {
     label: "Monitoring",
     dotClass: "bg-pg-healthy",
@@ -67,23 +67,33 @@ export function StatusBadge({
   showLabel = true,
   className,
 }: StatusBadgeProps) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.idle;
+  const resolvedStatus = statusConfig[status] ?? statusConfig.idle;
+  const isQuiet = status === "monitoring" || status === "idle";
+
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full font-medium border",
-        size === "sm"
-          ? "px-2 py-0.5 text-[11px]"
-          : "px-2.5 py-1 text-xs",
-        cfg.bgClass,
-        cfg.textClass,
-        cfg.borderClass,
-        "border-current/20",
+        size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs",
+        isQuiet
+          ? "bg-muted text-muted-foreground border-border"
+          : cn(
+              resolvedStatus.bgClass,
+              resolvedStatus.textClass,
+              resolvedStatus.borderClass,
+              "border-current/25"
+            ),
         className
       )}
     >
-      <span className={cn("rounded-full shrink-0", cfg.dotClass, size === "sm" ? "w-1.5 h-1.5" : "w-2 h-2")} />
-      {showLabel && cfg.label}
+      <span
+        className={cn(
+          "rounded-full shrink-0",
+          resolvedStatus.dotClass,
+          size === "sm" ? "w-1.5 h-1.5" : "w-2 h-2"
+        )}
+      />
+      {showLabel ? resolvedStatus.label : null}
     </span>
   );
 }

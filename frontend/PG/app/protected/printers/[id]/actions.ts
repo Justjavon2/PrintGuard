@@ -446,6 +446,19 @@ export async function startGuardForPrinterAction(formData: FormData): Promise<vo
     throw new Error(`Failed to start guard mode: ${responseDetail}`);
   }
 
+  const payload = (await response.json()) as {
+    notificationSent?: boolean;
+    skippedReason?: string | null;
+    retryAfterSeconds?: number | null;
+  };
+
   revalidatePath(`/protected/printers/${printerId}`);
-  redirect(`/protected/printers/${printerId}`);
+  if (payload.notificationSent === false && payload.skippedReason === "cooldown_active") {
+    const retryAfterSeconds = Number(payload.retryAfterSeconds ?? 0);
+    redirect(
+      `/protected/printers/${printerId}?guardStatus=cooldown&retryAfterSeconds=${encodeURIComponent(String(retryAfterSeconds))}`
+    );
+  }
+
+  redirect(`/protected/printers/${printerId}?guardStatus=sent`);
 }

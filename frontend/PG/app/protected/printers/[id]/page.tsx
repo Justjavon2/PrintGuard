@@ -18,6 +18,7 @@ import {
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 interface CameraSelectionInfo {
@@ -53,8 +54,9 @@ function computeCameraSelection(
   };
 }
 
-export default async function PrinterDetailPage({ params }: Props) {
+export default async function PrinterDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
   const context = await getProtectedContext();
 
   if (context.isDemoMode) {
@@ -79,6 +81,12 @@ export default async function PrinterDetailPage({ params }: Props) {
 
   const { printer } = printerResult;
   const activeAlert = printerResult.alert;
+  const guardStatus =
+    typeof resolvedSearchParams.guardStatus === "string" ? resolvedSearchParams.guardStatus : null;
+  const retryAfterSeconds =
+    typeof resolvedSearchParams.retryAfterSeconds === "string"
+      ? Number(resolvedSearchParams.retryAfterSeconds)
+      : 0;
   const isActive = printer.status === "danger" || printer.status === "warning";
   const assignedSourceSet = new Set(printerResult.assignedSourceKeys);
   const assignedSources = printerResult.availableSources.filter((source) =>
@@ -112,6 +120,19 @@ export default async function PrinterDetailPage({ params }: Props) {
         </div>
         <StatusBadge status={printer.status} />
       </div>
+
+      {guardStatus === "sent" ? (
+        <div className="rounded-lg border border-pg-healthy/30 bg-healthy-dim px-4 py-3 text-sm text-pg-healthy">
+          Guard mode started and confirmation email sent.
+        </div>
+      ) : null}
+
+      {guardStatus === "cooldown" ? (
+        <div className="rounded-lg border border-pg-warning/30 bg-warning-dim px-4 py-3 text-sm text-pg-warning">
+          Guard mode started, but email was skipped because of cooldown. Try again in about{" "}
+          {Math.max(1, Math.ceil(retryAfterSeconds / 60))} minute(s).
+        </div>
+      ) : null}
 
       {isActive && (
         <div className={cn(
