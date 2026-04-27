@@ -1,5 +1,9 @@
 # PrintGuard: AI-Powered Defect Detection App
 
+## Team Member
+**Javon Edmunds** — Backend Developer
+- Built and maintained the FastAPI backend, camera management system, YOLOv8 defect detection pipeline, serial printer control via pyserial, email notification service, and Supabase authentication integration.
+
 ## Mission Statement
 > Transforming additive manufacturing through autonomous, scalable, and concurrent monitoring that turns machine failures into instant alerts and actionable data.
 
